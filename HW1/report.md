@@ -4,6 +4,14 @@
 
 > In this assignment, you will apply the learned techniques to visualize data. Specifically, you will use the dataset provided below to plot **3** different types of charts.
 
+本次作业的可视化结果已经公开发布到Huggingface Space，可以直接看到我的作业成果。https://huggingface.co/spaces/2catycm/pm2.5-visualization
+
+本次作业的报告和代码在github开源 https://github.com/Open-Book-Studio/THU-Coursework-Data-Visualization。
+
+本次作业的代码构建了一个交互式的数据可视化App。
+
+![image-20250315191149860](./report.assets/image-20250315191149860.png)
+
 ## 题目背景与数据准备
 
 根据老师的介绍，我们这次可视化的S&M-HSTPM2d5是个开源数据集，通过有效地利用这种数据集里面的信息，可以做到很多。这里有几个背景问题我想搞明白：
@@ -184,7 +192,7 @@ with col1:
 ```python
 fig_line = px.line(chart_data, title="PM2.5随时间变化折线图")
 fig_line.update_layout(xaxis_title="时间", yaxis_title="PM2.5水平")
-st.plotly_chart(fig_line, use_container_width=True)
+st.plotly_chart(fig_line, use_container_width=True) # 图表宽度自适应容器宽度
 ```
 
 plotly画出来的更好看。
@@ -215,7 +223,7 @@ streamlit run HW1/VisualizationApp/app.py
 
 可以看到我们鼠标悬停的时候，可以看到交互式的信息，图片本身可以放大缩小看到细节。
 
-<img src="./report.assets/image-20250315183024178.png" alt="image-20250315183024178" style="zoom:50%;" />
+<img src="./report.assets/image-20250315184554122.png" alt="image-20250315184554122" style="zoom:50%;" />
 
 
 
@@ -243,28 +251,275 @@ streamlit run HW1/VisualizationApp/app.py
 
 现在我们让多模态大模型尝试解读一下图片。
 
-##### 对findings的解释
+![image-20250315192621462](./report.assets/image-20250315192621462.png)
+
+LLM尝试猜测了一下不同传感器的位置。
+
+![image-20250315192508365](./report.assets/image-20250315192508365.png)
+
+大模型感觉解读的不错，引用了这个环境领域的知识，包括安全限是25，重度污染标准是150，对于数据变化、波动的解释我觉得很合理。
+
+##### 对findings的解释（interpretations）
+
+我的发现就是8:00和11:00会有两个峰值，解释起来很简单，就是上班早高峰，通勤开车让PM2.5上升，以及中午吃饭。
+
+我们来看看大模型给出的政策建议
+
+![image-20250315192852940](./report.assets/image-20250315192852940.png)
+
+这个方面确实不是我的专长，感觉大模型说的还是比较有道理的，看起来确实是有逆温层之类的气象。
 
 ### (b) A Scatter Plot that shows how vehicles carrying mobile sensors move in the city.
 
 #### 代码编写
 
+在写这一题的时候，我们发现整个streamlit应用是可以自己检测代码更新然后rerun的，不过每次rerun需要重新读取一遍csv数据，这个是比较慢的，所以我们查阅了文档，发现了`st.cache_data`装饰器可以解决问题。数据筛选问题刚才我们已经解决了。
+
+然后我们直至核心问题，这道题不需要展示PM2.5，但是需要展示经纬度以及时间，记得课上老师**讲过视觉编码**，需要把重要的信息编码到重要的channel，比如位置适合放到XY轴，而时间这题是选择编码到颜色上。
+
+```python
+# 使用Plotly绘制散点图并根据时间调整透明度
+fig2 = go.Figure()
+colors = px.colors.qualitative.Plotly
+```
+
+- `go.Figure()`：初始化一个空的 Plotly 图表对象，用于后续添加散点图数据。
+- `colors = px.colors.qualitative.Plotly`：选取 Plotly 内置的定性颜色序列，用于区分不同传感器。
+
+接下来关键的一步是定义颜色转换函数
+
+```python
+def hex_to_rgba(hex_color, alpha):
+    hex_color = hex_color.lstrip('#')
+    r = int(hex_color[0:2], 16)
+    g = int(hex_color[2:4], 16)
+    b = int(hex_color[4:6], 16)
+    return f"rgba({r}, {g}, {b}, {alpha})"
+```
+
+- 该函数将传入的 HEX 色值转换为 RGBA 格式字符串，其中 `alpha` 为透明度。
+- `lstrip('#')`：去除 HEX 颜色前的 `#`。
+- 使用 `int(..., 16)` 将每两个字符转换为十进制数（表示 R、G、B 分量）。
+- 返回格式化字符串 `rgba(r, g, b, alpha)`。
+
+现在可以具体绘制每一个数据了
+
+```python
+total_time = (end_mobile - start_mobile).total_seconds()
+sensor_index = 0
+for sensor, data in mobile_sensor_data.items():
+    base_color = colors[sensor_index % len(colors)]
+    sensor_index += 1
+    custom_colors = []
+    for ts in data['timestamp']:
+        dt_seconds = (ts - start_mobile).total_seconds()
+        normalized = dt_seconds / total_time if total_time > 0 else 0
+        # 透明度：早期数据较透明（alpha值较低），后期较不透明
+        alpha = 0.3 + 0.7 * normalized
+        custom_colors.append(hex_to_rgba(base_color, alpha))
+    fig2.add_trace(go.Scatter(
+        x = data['lon'],
+        y = data['lat'],
+        mode = 'markers',
+        marker = dict(color = custom_colors, size = 10),
+        name = sensor
+    ))
+```
+
+两层for循环，不同传感器不同颜色，相同传感器不同时间是不同透明度，调用上面的hex_to_rgba
+
+最后增加表头信息，把图表放到streamlit
+
+```python
+fig2.update_layout(
+    xaxis_title="经度",
+    yaxis_title="纬度",
+    title="车辆移动散点图"
+)
+st.plotly_chart(fig2, use_container_width=True)
+```
+
+
+
 #### 绘制效果与分析
+
+##### 绘制的图片
+
+<img src="./report.assets/image-20250315190028402.png" alt="image-20250315190028402" style="zoom:50%;" />
+
+由于是交互图表，我们也可以自由鼠标选择区域，悬停查看数据内容。导出png如下：
+
+![newplot (1)](./report.assets/newplot (1).png)
+
+##### 描述图片以及从图片中看到的findings
+
+不同移动传感器总体上负责了不同的区域的巡逻，能覆盖更多区域的PM2.5数据。
+
+图片的中心位置会有更多交错的移动传感器，比如浅蓝色的和粉红色的以及橙色的覆盖的范围类似。
+
+有些移动的速度快，有些慢，而D12似乎没有移动。
+
+大部分汽车走的是直线。
+
+LLM的分析如下
+
+![image-20250315194006420](./report.assets/image-20250315194006420.png)
+
+但是LLM的读图能力会有错位，其实他说的D12是D15，颜色也未必是对得上的。
+
+
+
+##### 对findings的解释（interpretations）
+
+图片的中心位置可能是城市的中心，交通线路比较便捷。所以车比较多。
+
+中间几部车走的位置可能是内环。
+
+基于我们的分析，LLM给出了政策治理建议
+
+![image-20250315194042428](./report.assets/image-20250315194042428.png)
+
+
 
 ### (c) A 3D Histogram that shows the distribution of PM2.5 levels in the whole city at a specific time range.
 
+> i. Use the ’.csv’ files in both the *mobile* and *static* folders and filter the
+>
+> data by time stamps between **2019-01-01 09:00:00** and **2019-01-01**
+>
+> **09:10:00**.
+>
+> ii. Convert the GPS coordinates of the data to grid coordinates with a suitable
+>
+> resolution and aggregate the data in the same grid.
+>
+> iii. The x-axis, y-axis, and z-axis represent longitude, latitude, and the value
+>
+> of PM2.5, respectively.
+
 #### 代码编写
 
-在写这一题的时候，我们发现整个streamlit应用是可以自己检测代码更新然后rerun的，不过每次rerun需要重新读取一遍csv数据，这个是比较慢的，
+这一题中我们不再区分静态和动态的数据，反正就是时间地点PM2.5，简单粗暴的合并为一个大的数据集。
 
-所以我们查阅了文档，发现了`st.cache_data`装饰器可以解决问题。
+```python
+# 合并所有数据
+if data_list:
+    df_all = pd.concat(data_list, ignore_index=True)
+else:
+    df_all = pd.DataFrame(columns=["timestamp", "pm2d5", "lat", "lon"])
+```
+
+- 使用 `pd.concat` 将 `data_list` 中所有 DataFrame 合并为一个整体 DataFrame（`df_all`）。
+- 如果 `data_list` 为空，则创建一个空 DataFrame，保证后续处理不会出错。
 
 
+
+随后我们需要将GPS坐标网格化，这个很关键，把0.01范围内一样的坐标看做是一样。0.01在pandas里面round函数填写的是2，两位精度就是0.01
+
+```python
+df_all["lon_grid"] = df_all["lon"].round(2)
+df_all["lat_grid"] = df_all["lat"].round(2)
+
+```
+
+```python
+# 聚合每个网格内的PM2.5数据（计算平均值）
+df_group = df_all.groupby(["lon_grid", "lat_grid"]).agg({"pm2d5": "mean"}).reset_index()
+```
+
+- 使用 `groupby` 根据 `lon_grid` 和 `lat_grid` 对数据进行分组，对每个分组内的 `pm2d5` 值取平均，反映该网格区域的空气污染水平。
+- `reset_index()` 用于将分组后的结果转换为标准的 DataFrame 格式。
+
+由于 Plotly 不支持原生的 3D 柱状图（Bar3d），这里我们采用 3D 表面图来展示聚合后的数据分布。
+
+首先将聚合数据转换为矩阵，
+
+```python
+if not df_group.empty:
+    pivot = df_group.pivot(index="lat_grid", columns="lon_grid", values="pm2d5")
+    pivot = pivot.fillna(0)
+```
+
+- 利用pivot函数，将数据转换为矩阵形式，其中：
+  - 行 (`index`) 为纬度网格，
+  - 列 (`columns`) 为经度网格，
+  - 值 (`values`) 为该网格内的 PM2.5 平均值。
+- 对空缺值使用 `fillna(0)` 进行填充，确保矩阵完整。
+
+然后是画3D表面图
+
+```python
+# 创建3D表面图，x轴为经度、y轴为纬度、z轴为PM2.5平均值
+    fig3 = go.Figure(data=[go.Surface(z=pivot.values, x=pivot.columns, y=pivot.index, colorscale='Viridis')])
+else:
+    fig3 = go.Figure()
+fig3.update_layout(
+    scene=dict(
+        xaxis_title="经度",
+        yaxis_title="纬度",
+        zaxis_title="PM2.5"
+    ),
+    title="PM2.5分布3D表面图"
+)
+st.plotly_chart(fig3, use_container_width=True)
+```
+
+- 通过go.Surface绘制 3D 表面图：
+  - `z` 参数传入 pivot 矩阵的值，即各网格的 PM2.5 平均值；
+  - `x` 和 `y` 分别指定 pivot 的列和行，即经度和纬度坐标；
+  - `colorscale='Viridis'` 设置颜色比例尺，从而更直观地表示数值大小。
+- 如果没有数据（df_group 为空），则创建一个空的图表。
+- 使用 `update_layout` 设置图表场景中各轴的标题以及整体标题。
+- 最后，通过 `st.plotly_chart` 将图表显示在 Streamlit 应用中。
 
 #### 绘制效果与分析
 
+##### 绘制的图片
+
+<img src="./report.assets/image-20250315192103666.png" alt="image-20250315192103666" style="zoom:50%;" />
+
+由于是交互式图表，我们可以直接鼠标旋转这个3D mesh，从不同角度查看，比如说我放大到中间看到
+
+![image-20250315192155361](./report.assets/image-20250315192155361.png)
+
+##### 描述图片以及从图片中看到的findings
+
+在图表中可以看到城市在形成了一个W+X型，在W和X上面的位置排放的PM2.5是比较多的，而旁边的排放量就会递减。这个图形整理来说还是比较光滑连续的，但是也有一些地方可能是数据缺失，可能不能反映真实的情况。
+
+<img src="./report.assets/image-20250315193221803.png" alt="image-20250315193221803" style="zoom:33%;" />
+
+还可以看到最大值其实不在中心，而是在图像的四周，中间的小山峰不算很高
+
+![image-20250315193531562](./report.assets/image-20250315193531562.png)
+
+AI读图的结果比较有趣，分成了是三个部分来解读。
+
+![image-20250315194352192](./report.assets/image-20250315194352192.png)
+
+##### 对findings的解释（interpretations）
+
+可能W和X是这个图片中的交通主干道，和上一张图去对比，可以看到城市的中间好几台车在检测。
+
+至于为什么PM2.5峰值在郊区而不是市中心，可能是因为郊区那边有设置工厂，工厂生成了污染物到空气中。
+
+AI给出的解释和建议是
+
+![image-20250315194421319](./report.assets/image-20250315194421319.png)
 
 
-## 1.3-1.4 报告要求检查与LLM使用情况声明
 
-本次作业中，我们交叉使用了腾讯元宝、秘塔AI搜索、Github Copilot、Roo Code、Cline、streamlit doc AI等大模型工具。
+## 1.3-1.4 作业要求检查与LLM使用情况声明
+
+
+
+本次报告的目录如下：
+
+[TOC]
+
+对于每一张图，我们都包括了对代码的说明、图片的展示、图片的描述、以及对描述的解释。
+
+本次作业中，我们结合自身实际需要交叉使用了腾讯元宝、秘塔AI搜索、Github Copilot、Roo Code、Cline、streamlit doc AI、Google Gemini等大模型工具。在这个过程中，我们是学习的主体，主动通过外部AI工具获得更多信息，来取得对作业内容获得更好地理解，提高学习效率。
+
+- 大模型用于brainstorm idea，比如技术栈选型、概念讲解等、代码报错询问等。
+- 大模型用于辅助报告撰写，插入到我的文字之中。
+- 大模型用于辅助代码撰写，撰写后每一行会经过我的审计，必要时手动修改。
