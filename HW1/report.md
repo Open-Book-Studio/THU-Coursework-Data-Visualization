@@ -79,12 +79,32 @@ git submodule add https://huggingface.co/spaces/2catycm/pm2.5-visualization Visu
 
 ![alt text](./report.assets/image.png)
 
+并且安装库
+
+```bash
+pip install streamlit plotly
+```
 
 ## 1.2 根据数据绘制三种不同类型的图表
 
 > You need to create 3 different types of graphs based on the given dataset
 
 ### (a) A Line Chart that shows how the PM2.5 level changes over time
+
+> i. Use the ’.csv’ files in the static folder (in the VisualizationApp/data/Cangzhou) and filter the data by time stamps
+> between 2019-01-01 00:00:00 and 2019-01-01 12:00:00.
+> ii. The x-axis and the y-axis represent time and the value of PM2.5, respecetively.
+> iii. Plot one line for each static sensor and distinguish the sensors with colors.
+
+首先我们需要检查数据集的格式，
+
+```csv
+,pm2d5,lat,lon
+2018-12-27 00:00:00,60.206,38.322876,116.856699
+2018-12-27 00:01:00,63.90164,38.322876,116.856699
+2018-12-27 00:02:00,64.392,38.322876,116.856699
+```
+
 
 
 
