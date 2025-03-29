@@ -2,8 +2,8 @@
 	path = HW1/VisualizationApp
 	url = https://huggingface.co/spaces/2catycm/pm2.5-visualization
 [submodule "HW2/pykan"]
-	path = HW2/pykan
+	path = HW2/third_party/pykan
 	url = https://github.com/KindXiaoming/pykan.git
 [submodule "HW2/Efficient-KAN-in-Chinese"]
-	path = HW2/Efficient-KAN-in-Chinese
+	path = HW2/third_party/Efficient-KAN-in-Chinese
 	url = https://github.com/lgy112112/Efficient-KAN-in-Chinese.git
