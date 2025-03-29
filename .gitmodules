@@ -1,3 +1,6 @@
 [submodule "HW1/VisualizationApp"]
 	path = HW1/VisualizationApp
 	url = https://huggingface.co/spaces/2catycm/pm2.5-visualization
+[submodule "HW2/pykan"]
+	path = HW2/pykan
+	url = https://github.com/KindXiaoming/pykan.git
