@@ -7,3 +7,6 @@
 [submodule "HW2/Efficient-KAN-in-Chinese"]
 	path = HW2/third_party/Efficient-KAN-in-Chinese
 	url = https://github.com/lgy112112/Efficient-KAN-in-Chinese.git
+[submodule "HW2/VisualizationApp"]
+	path = HW2/VisualizationApp
+	url = https://huggingface.co/spaces/2catycm/VisualizationForGeneralizedGaussianMixture
