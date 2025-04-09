@@ -10,3 +10,6 @@
 [submodule "HW2/VisualizationApp"]
 	path = HW2/VisualizationApp
 	url = https://huggingface.co/spaces/2catycm/VisualizationForGeneralizedGaussianMixture
+[submodule "Project1/third_party/hypernetx-widget"]
+	path = Project1/third_party/hypernetx-widget
+	url = https://github.com/pnnl/hypernetx-widget.git
